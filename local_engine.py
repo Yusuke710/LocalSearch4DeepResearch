@@ -203,6 +203,11 @@ class LocalEngine:
     def convert_to_markdown_with_llm(self, text: str, file_name: str) -> Optional[str]:
         """Convert document text to markdown format using GPT."""
         try:
+            # Limit input text to approximately 4000 tokens
+            max_chars = 16000  # Approximate 4000 tokens
+            if len(text) > max_chars:
+                text = text[:max_chars] + "..."
+            
             system_prompt = """
             Convert the following document into well-structured markdown format. Follow these rules:
             1. Create a clear hierarchy with headers (# for main title, ## for sections, ### for subsections)
@@ -213,7 +218,7 @@ class LocalEngine:
             6. Add metadata section at the start with filename and type
             """
             
-            user_prompt = f"Please convert this document content to markdown. Filename: {file_name}\n\nContent:\n{text[:4000]}"
+            user_prompt = f"Please convert this document content to markdown. Filename: {file_name}\n\nContent:\n{text}"
             
             response = openai.chat.completions.create(
                 model="gpt-4-turbo-preview",
@@ -257,8 +262,12 @@ class LocalEngine:
         
         return '\n'.join(markdown_lines)
 
-    def chunk_markdown(self, text: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
+    def chunk_markdown(self, text: str, chunk_size: int = 800, overlap: int = 100) -> List[str]:
         """Split markdown text into chunks while preserving markdown structure."""
+        # Ensure chunk size is within OpenAI's token limits (roughly 4 chars per token)
+        max_tokens = 2000  # Safe limit for ada-002
+        chunk_size = min(chunk_size, max_tokens * 4)
+        
         lines = text.split('\n')
         chunks = []
         current_chunk = []
@@ -267,10 +276,31 @@ class LocalEngine:
         for line in lines:
             line_length = len(line)
             
+            # If a single line is too long, split it
+            if line_length > chunk_size:
+                words = line.split()
+                current_line = []
+                current_line_length = 0
+                
+                for word in words:
+                    if current_line_length + len(word) + 1 > chunk_size:
+                        chunks.append(' '.join(current_line))
+                        current_line = [word]
+                        current_line_length = len(word)
+                    else:
+                        current_line.append(word)
+                        current_line_length += len(word) + 1
+                
+                if current_line:
+                    line = ' '.join(current_line)
+                    line_length = len(line)
+            
             if current_length + line_length > chunk_size and current_chunk:
                 chunks.append('\n'.join(current_chunk))
                 
                 if overlap > 0:
+                    # Limit overlap size
+                    overlap = min(overlap, chunk_size // 4)
                     overlap_size = 0
                     overlap_lines = []
                     for prev_line in reversed(current_chunk):
@@ -290,6 +320,9 @@ class LocalEngine:
         
         if current_chunk:
             chunks.append('\n'.join(current_chunk))
+        
+        # Add safety check for chunk sizes
+        chunks = [chunk[:max_tokens * 4] for chunk in chunks]
         
         return chunks
 
@@ -323,11 +356,22 @@ class LocalEngine:
         """Generate embeddings for a batch of texts."""
         try:
             if EMBEDDING_MODEL == EmbeddingModel.OPENAI:
-                response = openai.embeddings.create(
-                    model=OPENAI_EMBEDDING_MODEL,
-                    input=texts
-                )
-                return np.array([data.embedding for data in response.data], dtype=np.float32)
+                # Process smaller batches with token limit check
+                max_batch_size = 10  # Smaller batch size for safety
+                all_embeddings = []
+                
+                for i in range(0, len(texts), max_batch_size):
+                    batch = texts[i:i + max_batch_size]
+                    # Truncate each text to stay within token limits
+                    batch = [text[:8000] for text in batch]  # ~2000 tokens per text
+                    response = openai.embeddings.create(
+                        model=OPENAI_EMBEDDING_MODEL,
+                        input=batch
+                    )
+                    batch_embeddings = [data.embedding for data in response.data]
+                    all_embeddings.extend(batch_embeddings)
+                
+                return np.array(all_embeddings, dtype=np.float32)
             else:
                 if model is None:
                     model = self.get_embedding_model()

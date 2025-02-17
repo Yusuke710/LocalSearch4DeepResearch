@@ -15,7 +15,7 @@ EMBEDDINGS_DIR = BASE_DIR / "processed" / "embeddings"
 INDEX_DIR = BASE_DIR / "processed" / "index"
 
 # Configuration
-EMBEDDING_MODEL = EmbeddingModel(os.getenv("EMBEDDING_MODEL", "sentence-transformer"))
+EMBEDDING_MODEL = EmbeddingModel(os.getenv("EMBEDDING_MODEL", "openai"))
 SENTENCE_TRANSFORMER_MODEL = os.getenv("SENTENCE_TRANSFORMER_MODEL", "all-MiniLM-L6-v2")
 OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002")
 EMBEDDING_DIMENSION = 1536 if EMBEDDING_MODEL == EmbeddingModel.OPENAI else 384
