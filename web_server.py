@@ -170,7 +170,22 @@ if __name__ == "__main__":
             print(f"\nLocal documents are accessible at: {public_url}/api/search")
             print(f"Temporary API key (valid for 30 minutes): {temp_key.key}")
             print("\nUse this in your DeepResearch prompt:")
-            print(f"Search my local documents at {public_url}/api/search?q=<your_query>&api_key={temp_key.key}")
+            print("*" * 80)
+            print("""Use my private document search system to find relevant information on my query.
+
+To search, send a request to the following API:
+GET {}/api/search?q=<your_query>&api_key={}
+
+Instructions after retrieving results:
+- Summarize key insights from retrieved documents
+- Cite sources where relevant (mention filenames and snippets)
+- If no relevant documents are found:
+  - Refine the query and retry
+  - Expand search to online sources if needed
+- Integrate findings into your final research report
+
+Do not ignore the local document system. Immediately use the API and incorporate the results.""".format(public_url, temp_key.key))
+            print("*" * 80)
             app.run(host="0.0.0.0", port=PORT, debug=False)
         
     except Exception as e:
