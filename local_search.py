@@ -440,14 +440,6 @@ def index():
                     "q": "search query (required)",
                     "api_key": "your API key (required)"
                 }
-            },
-            "source_info": {
-                "url": "/api/source-info",
-                "method": "GET"
-            },
-            "preview": {
-                "url": "/api/preview/<file_path>",
-                "method": "GET"
             }
         },
         "indexed_documents": len(document_metadata),
@@ -541,50 +533,6 @@ def search():
         "results": sorted(results, key=lambda x: x["score"], reverse=True)
     })
 
-# Add metadata endpoint for DeepResearch to understand the source
-@app.route("/api/source-info", methods=["GET"])
-def source_info():
-    return jsonify({
-        "name": "Local Documents",
-        "description": "Private document collection stored locally",
-        "document_count": len(document_metadata),
-        "file_types": list(set(Path(p).suffix for p in document_metadata.keys())),
-        "last_updated": max(doc["last_processed"] for doc in document_metadata.values())
-    })
-
-# Add document preview endpoint
-@app.route("/api/preview/<path:file_path>")
-def get_document_preview(file_path):
-    try:
-        full_path = Path(file_path)
-        if str(full_path) not in document_metadata:
-            return jsonify({"error": "Document not found"}), 404
-            
-        doc_data = document_metadata[str(full_path)]
-        preview_data = {
-            "title": full_path.name,
-            "chunks": [],
-            "metadata": {
-                "file_type": full_path.suffix.lstrip('.'),
-                "last_processed": doc_data["last_processed"],
-                "chunk_count": len(doc_data["chunks"])
-            }
-        }
-        
-        # Get preview of each chunk
-        for chunk in doc_data["chunks"]:
-            markdown_path = BASE_DIR / chunk["markdown_file"]
-            with open(markdown_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                preview_data["chunks"].append({
-                    "index": chunk["chunk_index"],
-                    "preview": content[:200] + "..."
-                })
-        
-        return jsonify(preview_data)
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/create-temp-key", methods=["POST"])
 @require_api_key  # Still require master API key to create temporary keys
@@ -627,7 +575,7 @@ if __name__ == "__main__":
             print(f"\nLocal documents are accessible at: {public_url}/api/search")
             print(f"Temporary API key (valid for 30 minutes): {temp_key.key}")
             print("\nUse this in your DeepResearch prompt:")
-            print(f"Search my local documents at {public_url}/api/search?api_key={temp_key.key}")
+            print(f"Search my local documents at {public_url}/api/search?q=<your_query>&api_key={temp_key.key}")
             
             # Run the Flask app with the new port, debug mode disabled
             app.run(host="0.0.0.0", port=PORT, debug=False)
