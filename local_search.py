@@ -19,6 +19,7 @@ import secrets
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import logging
+import argparse
 
 app = Flask(__name__)
 
@@ -372,7 +373,25 @@ def initialize_search_index() -> tuple[List[str], faiss.Index]:
     # Create and save FAISS index
     index = faiss.IndexFlatL2(EMBEDDING_DIMENSION)
     if len(embeddings) > 0:
-        index.add(embeddings)
+        try:
+            index.add(embeddings)
+        except AssertionError:
+            # Dimension mismatch - clear the metadata and reprocess all documents
+            print("Embedding model changed - reprocessing all documents...")
+            global document_metadata
+            document_metadata = {}
+            save_metadata()
+            
+            # Clear existing processed files
+            for dir_path in [MARKDOWN_DIR, EMBEDDINGS_DIR]:
+                for file in dir_path.glob("*"):
+                    file.unlink()
+            
+            # Recreate index with new embeddings
+            titles, embeddings = load_documents(model)
+            index = faiss.IndexFlatL2(EMBEDDING_DIMENSION)
+            if len(embeddings) > 0:
+                index.add(embeddings)
     
     # Save index
     index_path = INDEX_DIR / "faiss_index.bin"
@@ -581,26 +600,40 @@ def create_temporary_key():
     })
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run the local search server')
+    parser.add_argument('--local', action='store_true', help='Run in local mode without ngrok')
+    args = parser.parse_args()
+
     # Use a different port (e.g., 5001)
     PORT = 5001
     
     try:
-        # Start ngrok tunnel with the new port
-        public_url = ngrok.connect(PORT).public_url
-        
         # Create initial temporary key
         temp_key = TemporaryAPIKey()
         temp_api_keys.append(temp_key)
-        
-        print(f"\nLocal documents are accessible at: {public_url}/api/search")
-        print(f"Temporary API key (valid for 30 minutes): {temp_key.key}")
-        print("\nUse this in your DeepResearch prompt:")
-        print(f"Search my local documents at {public_url}/api/search?api_key={temp_key.key}")
-        
-        # Run the Flask app with the new port, debug mode disabled
-        app.run(host="0.0.0.0", port=PORT, debug=False)
+
+        if args.local:
+            print(f"\nRunning in local mode")
+            print(f"Web Interface: http://localhost:{PORT}/test")
+            print(f"API Endpoint: http://localhost:{PORT}/api/search")
+            print(f"Temporary API key (valid for 30 minutes): {temp_key.key}")
+            
+            # Run the Flask app with the new port, debug enabled for local development
+            app.run(host="0.0.0.0", port=PORT, debug=True)
+        else:
+            # Start ngrok tunnel with the new port
+            public_url = ngrok.connect(PORT).public_url
+            
+            print(f"\nLocal documents are accessible at: {public_url}/api/search")
+            print(f"Temporary API key (valid for 30 minutes): {temp_key.key}")
+            print("\nUse this in your DeepResearch prompt:")
+            print(f"Search my local documents at {public_url}/api/search?api_key={temp_key.key}")
+            
+            # Run the Flask app with the new port, debug mode disabled
+            app.run(host="0.0.0.0", port=PORT, debug=False)
         
     except Exception as e:
         print(f"Error starting server: {str(e)}")
-        # Kill any existing ngrok processes
-        ngrok.kill()
+        if not args.local:
+            # Kill any existing ngrok processes
+            ngrok.kill()
