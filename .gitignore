@@ -1,3 +1,5 @@
 data
 venv
 .env
+generate_test_files.py
+__pycache__
