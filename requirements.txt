@@ -1,0 +1,10 @@
+flask
+faiss-cpu
+sentence-transformers
+pdfplumber
+python-docx
+openai
+python-dotenv  # Optional, for managing environment variables
+pyngrok  # Add this for tunneling
+flask-limiter
+fpdf
