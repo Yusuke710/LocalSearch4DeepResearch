@@ -13,7 +13,7 @@ A local document search system designed to integrate with OpenAI's DeepResearch,
 - ✅ Document chunking with overlap
 - ✅ Test interface
 - 🚧 Error handling improvements
-- 📝 More features planned
+- 📝 DeepResearch does not search the link user provides as it may consider it as jailbreaking. Fix this by modifying the prompt to type in DeepResearch.
 
 ## Project Structure
 
@@ -65,7 +65,7 @@ python web_server.py
 <Your prompt>
 
 Search my local documents at <ngrok_url>/api/search?q=<your_query>&api_key=<your_api_key>
-# e.g. Search my local documents at https://abc123.ngrok-free.app/api/search?q=<your_query>&api_key=def456
+# e.g. Search my local documents at https://abc123.ngrok-free.app/api/search?q=machine%20learning&api_key=def456
 ```
 
 ## Features
